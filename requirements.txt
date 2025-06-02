@@ -1,2 +1,6 @@
 streamlit
 pandas
+torch
+pytorch-lightning
+pytorch-forecasting
+scikit-learn

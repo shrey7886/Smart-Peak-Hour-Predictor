@@ -1,0 +1,5 @@
+timestamp,transactions,promotion_flag,promotion_type,staff_count,event_flag,event_name,inventory_alert,hour,day_of_week,is_weekend,time_idx
+2024-05-01 09:00:00,24,1,discount,3,0,,0,9,2,0,0
+2024-05-01 10:00:00,30,0,,2,0,,0,10,2,0,1
+2024-05-01 11:00:00,22,0,,3,0,,0,11,2,0,2
+2024-05-01 12:00:00,50,1,combo,4,1,Lunch Hour Promo,1,12,2,0,3
