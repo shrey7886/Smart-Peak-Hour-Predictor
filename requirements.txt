@@ -1,6 +1,10 @@
+# Phase 1: Streamlit and preprocessing
 streamlit
-pandas
-torch
-pytorch-lightning
-pytorch-forecasting
-scikit-learn
+pandas==2.2.2
+scikit-learn==1.4.2
+matplotlib
+
+# Phase 2: Model training
+torch>=1.10,<2.1
+pytorch-lightning==1.9.5
+pytorch-forecasting==1.0.0

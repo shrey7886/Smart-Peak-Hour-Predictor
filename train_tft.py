@@ -1,8 +1,8 @@
 import os
 import pandas as pd
-import torch
 from pytorch_forecasting import TimeSeriesDataSet, TemporalFusionTransformer
 from pytorch_forecasting.data import NaNLabelEncoder
+from pytorch_forecasting.metrics import QuantileLoss
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 
@@ -26,7 +26,7 @@ min_required_rows = 30  # min rows needed: encoder + prediction
 if len(df) < min_required_rows:
     raise ValueError(f"❌ Dataset too small. Needs at least {min_required_rows} rows, found {len(df)}.")
 
-# ⚙️ Model configs for small dataset
+# ⚙️ Model configs
 max_encoder_length = 24  # 1 day
 max_prediction_length = 6  # 6 hours
 
@@ -60,10 +60,10 @@ tft = TemporalFusionTransformer.from_dataset(
     hidden_size=16,
     attention_head_size=1,
     dropout=0.1,
-    loss=torch.nn.MSELoss(),  # Replace with QuantileLoss later for quantile forecasting
+    loss=QuantileLoss(),
     log_interval=10,
     log_val_interval=1,
-    reduce_on_plateau_patience=4,
+    reduce_on_plateau_patience=4
 )
 
 # 💾 Save best model checkpoint
@@ -75,18 +75,17 @@ checkpoint_callback = ModelCheckpoint(
     mode="min"
 )
 
-# ⚡ Train the model
+# ⚡ Trainer (PyTorch Lightning 1.9.5 compatible)
 trainer = Trainer(
     max_epochs=20,
     gradient_clip_val=0.1,
     callbacks=[checkpoint_callback],
-    enable_model_summary=True,
-    log_every_n_steps=10,
-    accelerator="auto"
+    progress_bar_refresh_rate=10,  # use this instead of log_every_n_steps
+    gpus=0  # use 1 if you have GPU
 )
 
-# 🚀 Fit model
+# 🚀 Train the model
 trainer.fit(tft, train_dataloaders=train_dataloader)
 
-# ✅ Done
+# ✅ Training complete
 print("✅ Model training complete. Checkpoint saved at: models/shop_tft.ckpt")
