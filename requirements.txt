@@ -4,6 +4,7 @@ pandas==2.2.2
 scikit-learn==1.4.2
 matplotlib
 
+
 # Phase 2: Model training
 torch>=1.10,<2.1
 pytorch-lightning==1.9.5
