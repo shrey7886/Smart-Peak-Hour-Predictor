@@ -1,17 +1,21 @@
-# Phase 1: Streamlit and preprocessing
-# Core packages
-torch>=2.0,<2.8
-pandas>=2.0
-matplotlib>=3.5
-scikit-learn>=1.3
+# Core ML + Time Series
+torch==2.2.2
+pytorch-forecasting==1.0.0
+pytorch-lightning==2.2.4
 
-# Streamlit UI
-streamlit>=1.25
+# Data Processing
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.4.2
 
-# ML frameworks (use these specific versions to avoid model loading errors)
-pytorch-lightning==2.1.3
-pytorch-forecasting==1.3.0
+# Visualization + Streamlit UI
+matplotlib==3.8.4
+streamlit==1.45.1
+tqdm==4.66.4  # Progress bars
 
-# Optional but recommended
-numpy>=1.24
+# Optional stability
+python-dateutil>=2.8.2
+pytz>=2023.3
+
+
 

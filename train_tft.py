@@ -1,4 +1,5 @@
 import os
+import shutil
 import pandas as pd
 import torch
 
@@ -9,33 +10,40 @@ from pytorch_forecasting.metrics import QuantileLoss
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-# 🚨 Ensure the processed data exists
-if not os.path.exists("data/processed_shop.csv"):
+# === CONFIG ===
+data_path = "data/processed_shop.csv"
+model_dir = "models"
+model_name = "shop_tft.ckpt"
+max_encoder_length = 24
+max_prediction_length = 6
+batch_size = 32
+min_required_rows = 30
+seed = 42
+
+# === Ensure data exists ===
+if not os.path.exists(data_path):
     raise FileNotFoundError("❌ 'data/processed_shop.csv' not found. Run Phase 1 to generate it.")
 
-# 📊 Load and prepare data
-df = pd.read_csv("data/processed_shop.csv")
+# === Set seed and load data ===
+seed_everything(seed)
+df = pd.read_csv(data_path)
 print(f"🔍 Loaded dataset with {len(df)} rows.")
 
-# 🧠 Add required group column
-df["shop"] = "shop_1"
-
-# 🧹 Clean categorical columns
-df["promotion_type"] = df["promotion_type"].astype(str).fillna("None")
-df["event_name"] = df["event_name"].astype(str).fillna("None")
-
-# ✅ Minimum rows check
-min_required_rows = 30  # encoder + prediction
 if len(df) < min_required_rows:
     raise ValueError(f"❌ Dataset too small. Needs at least {min_required_rows} rows, found {len(df)}.")
 
-# 🔁 Configs
-max_encoder_length = 24
-max_prediction_length = 6
+# === Prepare Data ===
+df["shop"] = "shop_1"
+df["promotion_type"] = df["promotion_type"].astype(str).fillna("None")
+df["event_name"] = df["event_name"].astype(str).fillna("None")
+df = df.sort_values("time_idx")
 
-# ✅ Define dataset
+# === Time cutoff for encoder/decoder window ===
+training_cutoff = df["time_idx"].max() - max_prediction_length
+
+# === Define Training Dataset ===
 training = TimeSeriesDataSet(
-    df,
+    df[df["time_idx"] <= training_cutoff],
     time_idx="time_idx",
     target="transactions",
     group_ids=["shop"],
@@ -51,12 +59,19 @@ training = TimeSeriesDataSet(
     },
     max_encoder_length=max_encoder_length,
     max_prediction_length=max_prediction_length,
+    add_relative_time_idx=True,
+    add_target_scales=True,
+    add_encoder_length=True,
 )
 
-# 🔁 Dataloader
-train_dataloader = training.to_dataloader(train=True, batch_size=32, num_workers=0)
+# === Validation Set ===
+val_dataset = TimeSeriesDataSet.from_dataset(training, df, stop_randomization=True)
 
-# 🧠 Define model (LightningModule under the hood)
+# === Dataloaders ===
+train_dataloader = training.to_dataloader(train=True, batch_size=batch_size, num_workers=0)
+val_dataloader = val_dataset.to_dataloader(train=False, batch_size=batch_size, num_workers=0)
+
+# === Define Model ===
 tft = TemporalFusionTransformer.from_dataset(
     training,
     learning_rate=0.03,
@@ -67,18 +82,19 @@ tft = TemporalFusionTransformer.from_dataset(
     log_interval=10,
     log_val_interval=1,
     reduce_on_plateau_patience=4,
+    log_gradient_flow=False,
 )
 
-# 💾 Checkpoint saving
+# === Checkpointing ===
 checkpoint_callback = ModelCheckpoint(
-    dirpath="models",
-    filename="shop_tft",
-    monitor="train_loss",
+    dirpath=model_dir,
+    filename=model_name.replace(".ckpt", ""),
+    monitor="val_loss",
     save_top_k=1,
     mode="min"
 )
 
-# ⚡ Trainer
+# === Train ===
 trainer = Trainer(
     max_epochs=20,
     accelerator="auto",
@@ -87,7 +103,17 @@ trainer = Trainer(
     log_every_n_steps=10,
 )
 
-# ✅ Train model
-print(f"Model type: {type(tft)}")
-trainer.fit(tft, train_dataloaders=train_dataloader)
-print("✅ Model training complete. Checkpoint saved at: models/shop_tft.ckpt")
+print(f"📚 Starting training on {len(train_dataloader)} batches...")
+trainer.fit(tft, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+
+# === Save Best Checkpoint as shop_tft.ckpt ===
+final_path = os.path.join(model_dir, model_name)
+best_model_path = checkpoint_callback.best_model_path
+
+if best_model_path != final_path:
+    if os.path.exists(final_path):
+        os.remove(final_path)
+    shutil.move(best_model_path, final_path)
+
+print(f"✅ Training complete. Model saved to: {final_path}")
+

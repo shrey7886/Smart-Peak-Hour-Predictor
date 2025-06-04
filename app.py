@@ -1,8 +1,11 @@
+# ✅ Final `app.py` with Synced Prediction Logic
+
 import streamlit as st
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
 import torch
+from torch.utils.data import DataLoader
 
 from pytorch_forecasting import TimeSeriesDataSet, TemporalFusionTransformer
 from pytorch_forecasting.data import NaNLabelEncoder
@@ -45,17 +48,24 @@ if uploaded_file:
         if st.button("🔮 Predict Peak Hours"):
             st.subheader("📈 Prediction Results")
 
-            # Load preprocessed data
             df = pd.read_csv("data/processed_shop.csv")
             df["shop"] = "shop_1"
             df["promotion_type"] = df["promotion_type"].astype(str).fillna("None")
             df["event_name"] = df["event_name"].astype(str).fillna("None")
 
+            required_reals = [
+                "time_idx", "transactions", "hour", "day_of_week", "is_weekend",
+                "staff_count", "promotion_flag", "event_flag", "inventory_alert"
+            ]
+            df = df.dropna(subset=required_reals)
+            df = df.sort_values("time_idx")
+
             max_encoder_length = 24
             max_prediction_length = 6
 
-            dataset = TimeSeriesDataSet(
-                df,
+            training_cutoff = df["time_idx"].max() - max_prediction_length
+            training = TimeSeriesDataSet(
+                df[df["time_idx"] <= training_cutoff],
                 time_idx="time_idx",
                 target="transactions",
                 group_ids=["shop"],
@@ -71,31 +81,32 @@ if uploaded_file:
                 },
                 max_encoder_length=max_encoder_length,
                 max_prediction_length=max_prediction_length,
+                add_relative_time_idx=True,
+                add_target_scales=True,
+                add_encoder_length=True,
             )
+
+            prediction = TimeSeriesDataSet.from_dataset(training, df, predict=True, stop_randomization=True)
+            prediction_dl = DataLoader(prediction, batch_size=1, shuffle=False, num_workers=0)
 
             model_path = "models/shop_tft.ckpt"
             if not os.path.exists(model_path):
                 st.error("❌ Model checkpoint not found. Please train it using Phase 2.")
                 st.stop()
 
-            # ✅ Load model
-            model = TemporalFusionTransformer.load_from_checkpoint(
-                model_path,
-                map_location=torch.device("cpu")
-            )
+            model = TemporalFusionTransformer.load_from_checkpoint(model_path, map_location=torch.device("cpu"))
 
-            # ✅ Correct tuple unpacking
-            raw_preds, x = model.predict(dataset, mode="raw", return_x=True)
+            raw_output = model.predict(prediction_dl, mode="raw", return_x=True)
+            raw_preds = raw_output["predictions"]
+            x = raw_output["x"]
 
             forecast = raw_preds[0].detach().cpu().numpy().flatten()
             time_steps = x["decoder_time_idx"][0].detach().cpu().numpy()
 
-            # Detect peak hours
             top_n = 3
             top_idx = forecast.argsort()[-top_n:][::-1]
             peak_hours = time_steps[top_idx]
 
-            # Format output
             result_df = pd.DataFrame({
                 "Hour": time_steps,
                 "Predicted Transactions": forecast
@@ -104,10 +115,8 @@ if uploaded_file:
                 lambda x: "📈 Add staff/stock!" if x > result_df["Predicted Transactions"].quantile(0.75) else "✅ Normal"
             )
 
-            # Show table
             st.dataframe(result_df)
 
-            # Plot chart
             st.subheader("📊 Forecast Chart")
             fig, ax = plt.subplots(figsize=(10, 4))
             ax.bar(result_df["Hour"], result_df["Predicted Transactions"], color="skyblue")
@@ -117,6 +126,5 @@ if uploaded_file:
             ax.set_ylabel("Predicted Transactions")
             st.pyplot(fig)
 
-            # Save result
             result_df.to_csv("data/predicted_peak_hours.csv", index=False)
             st.success("✅ Forecast saved to: data/predicted_peak_hours.csv")
