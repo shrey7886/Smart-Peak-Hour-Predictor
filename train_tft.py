@@ -1,13 +1,13 @@
 import os
 import pandas as pd
+import torch
+
 from pytorch_forecasting import TimeSeriesDataSet, TemporalFusionTransformer
 from pytorch_forecasting.data import NaNLabelEncoder
 from pytorch_forecasting.metrics import QuantileLoss
-from lightning.pytorch import Trainer, LightningModule
+
+from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
-
-# rest of your code remains the same...
-
 
 # 🚨 Ensure the processed data exists
 if not os.path.exists("data/processed_shop.csv"):
@@ -25,15 +25,15 @@ df["promotion_type"] = df["promotion_type"].astype(str).fillna("None")
 df["event_name"] = df["event_name"].astype(str).fillna("None")
 
 # ✅ Minimum rows check
-min_required_rows = 30  # min rows needed: encoder + prediction
+min_required_rows = 30  # encoder + prediction
 if len(df) < min_required_rows:
     raise ValueError(f"❌ Dataset too small. Needs at least {min_required_rows} rows, found {len(df)}.")
 
-# ⚙️ Model configs for small dataset
-max_encoder_length = 24  # 1 day
-max_prediction_length = 6  # 6 hours
+# 🔁 Configs
+max_encoder_length = 24
+max_prediction_length = 6
 
-# ✅ Create TimeSeriesDataSet
+# ✅ Define dataset
 training = TimeSeriesDataSet(
     df,
     time_idx="time_idx",
@@ -56,20 +56,20 @@ training = TimeSeriesDataSet(
 # 🔁 Dataloader
 train_dataloader = training.to_dataloader(train=True, batch_size=32, num_workers=0)
 
-# 🧠 TFT Model
+# 🧠 Define model (LightningModule under the hood)
 tft = TemporalFusionTransformer.from_dataset(
     training,
     learning_rate=0.03,
     hidden_size=16,
     attention_head_size=1,
     dropout=0.1,
-    loss=QuantileLoss(),  # ✅ Use a compatible loss
+    loss=QuantileLoss(),
     log_interval=10,
     log_val_interval=1,
     reduce_on_plateau_patience=4,
 )
 
-# 💾 Save best model checkpoint
+# 💾 Checkpoint saving
 checkpoint_callback = ModelCheckpoint(
     dirpath="models",
     filename="shop_tft",
@@ -78,22 +78,16 @@ checkpoint_callback = ModelCheckpoint(
     mode="min"
 )
 
-# ⚡ Train the model
+# ⚡ Trainer
 trainer = Trainer(
     max_epochs=20,
+    accelerator="auto",
     gradient_clip_val=0.1,
     callbacks=[checkpoint_callback],
-    enable_model_summary=True,
     log_every_n_steps=10,
-    accelerator="auto"
 )
 
+# ✅ Train model
 print(f"Model type: {type(tft)}")
-print(f"Is instance of LightningModule? {isinstance(tft, LightningModule)}")
-
-# 🚀 Fit model
 trainer.fit(tft, train_dataloaders=train_dataloader)
-
-# ✅ Done
 print("✅ Model training complete. Checkpoint saved at: models/shop_tft.ckpt")
-

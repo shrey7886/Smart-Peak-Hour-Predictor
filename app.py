@@ -1,9 +1,8 @@
-# app.py
-
 import streamlit as st
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import torch
 
 from pytorch_forecasting import TimeSeriesDataSet, TemporalFusionTransformer
 from pytorch_forecasting.data import NaNLabelEncoder
@@ -79,15 +78,17 @@ if uploaded_file:
                 st.error("❌ Model checkpoint not found. Please train it using Phase 2.")
                 st.stop()
 
-            # ✅ FIXED: Correct unpacking of predict() output
+            # ✅ Load model
             model = TemporalFusionTransformer.load_from_checkpoint(
                 model_path,
-                map_location="cpu"
+                map_location=torch.device("cpu")
             )
 
-            raw_preds, x, _ = model.predict(dataset, mode="raw", return_x=True)
+            # ✅ Correct tuple unpacking
+            raw_preds, x = model.predict(dataset, mode="raw", return_x=True)
+
             forecast = raw_preds[0].detach().cpu().numpy().flatten()
-            time_steps = x["decoder_time_idx"][0].numpy()
+            time_steps = x["decoder_time_idx"][0].detach().cpu().numpy()
 
             # Detect peak hours
             top_n = 3
