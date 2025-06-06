@@ -1,7 +1,18 @@
-streamlit==1.29.0
-pandas==2.0.3
+# Core ML + Time Series
 torch==2.0.1
-pytorch-lightning<2.0.0
 pytorch-forecasting<1.0.0
-scikit-learn==1.3.0
+pytorch-lightning<2.0.0
+
+# Data Processing
+pandas==2.0.3
 numpy==1.24.3
+scikit-learn==1.3.0
+
+# Visualization + Streamlit UI
+matplotlib==3.8.4
+streamlit==1.29.0
+tqdm==4.66.4  # Progress bars
+
+# Optional stability
+python-dateutil>=2.8.2
+pytz>=2023.3

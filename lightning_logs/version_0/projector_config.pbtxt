@@ -1,0 +1,10 @@
+embeddings {
+tensor_name: "promotion_type:01220"
+tensor_path: "01220/promotion_type/tensors.tsv"
+metadata_path: "01220/promotion_type/metadata.tsv"
+}
+embeddings {
+tensor_name: "event_name:01220"
+tensor_path: "01220/event_name/tensors.tsv"
+metadata_path: "01220/event_name/metadata.tsv"
+}
