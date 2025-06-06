@@ -192,3 +192,25 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Virtual Environment
+venv/
+ENV/
+
+# PyTorch Lightning logs and checkpoints
+lightning_logs/
+models/
+wandb/
+
+# Generated data
+data/predictions.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
