@@ -6,12 +6,6 @@ import torch
 from pytorch_forecasting import TimeSeriesDataSet, TemporalFusionTransformer
 from pytorch_forecasting.data import NaNLabelEncoder
 from pytorch_forecasting.metrics import QuantileLoss
-<<<<<<< HEAD
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
-=======
->>>>>>> f244cd6bf34b582f942c082fe04c1fd4f009d3cf
-
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint
 
@@ -83,11 +77,7 @@ tft = TemporalFusionTransformer.from_dataset(
     hidden_size=16,
     attention_head_size=1,
     dropout=0.1,
-<<<<<<< HEAD
-    loss=QuantileLoss(),  # Using QuantileLoss which is a proper PyTorch Lightning Metric
-=======
     loss=QuantileLoss(),
->>>>>>> f244cd6bf34b582f942c082fe04c1fd4f009d3cf
     log_interval=10,
     log_val_interval=1,
     reduce_on_plateau_patience=4,
