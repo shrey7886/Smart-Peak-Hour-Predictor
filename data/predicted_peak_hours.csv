@@ -1,7 +1,7 @@
-Hour,Predicted_Transactions,Suggestion
-2000,21.623505,✅ Normal
-2001,21.35593,✅ Normal
-2002,23.706905,📈 Add staff/stock!
-2003,17.879751,✅ Normal
-2004,22.165031,📈 Add staff/stock!
-2005,21.640743,✅ Normal
+Timestamp,Hour,Predicted_Transactions,Suggestion,Confidence
+2024-07-23 17:00:00,17,21.623505,✅ Normal,Medium
+2024-07-23 18:00:00,18,21.35593,✅ Normal,Low
+2024-07-23 19:00:00,19,23.706905,📈 Add staff/stock!,High
+2024-07-23 20:00:00,20,17.879751,✅ Normal,Low
+2024-07-23 21:00:00,21,22.165031,📈 Add staff/stock!,Medium
+2024-07-23 22:00:00,22,21.640743,✅ Normal,Medium

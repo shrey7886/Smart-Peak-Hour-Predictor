@@ -1,3 +1,23 @@
+# Python virtual environment
+venv/
+venv_new/
+__pycache__/
+*.pyc
+
+# IDE files
+.vscode/
+.idea/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
+# Local development settings
+.DS_Store
+Thumbs.db
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
