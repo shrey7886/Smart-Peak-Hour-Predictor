@@ -1,7 +1,7 @@
-Timestamp,Hour,Predicted_Transactions,Suggestion,Confidence
-2024-07-23 17:00:00,17,21.623505,✅ Normal,Medium
-2024-07-23 18:00:00,18,21.35593,✅ Normal,Low
-2024-07-23 19:00:00,19,23.706905,📈 Add staff/stock!,High
-2024-07-23 20:00:00,20,17.879751,✅ Normal,Low
-2024-07-23 21:00:00,21,22.165031,📈 Add staff/stock!,Medium
-2024-07-23 22:00:00,22,21.640743,✅ Normal,Medium
+Hour,Predicted_Transactions,Weather,Holiday_Type,Temperature,Rain,Suggestion
+2000,21.612837,Rain,Weekend,28.43532897929458,1.0105770722701786,"✅ Normal (Rain, 28.4°C) - Weekend"
+2001,21.798052,Clouds,Weekend,32.33270429639302,0.0,"✅ Normal (Clouds, 32.3°C) - Weekend"
+2002,20.874706,Thunderstorm,Special Event,19.442098752432244,0.0,"✅ Normal (Thunderstorm, 19.4°C) - Special Event"
+2003,22.003765,Clear,Regular,24.82087210646769,0.0,"✅ Normal (Clear, 24.8°C) - Regular"
+2004,24.06471,Clear,Regular,22.342727243203925,0.0,"📈 Add staff/stock! (Clear, 22.3°C) - Regular"
+2005,23.523752,Clear,Regular,17.16070287317272,0.0,"📈 Add staff/stock! (Clear, 17.2°C) - Regular"

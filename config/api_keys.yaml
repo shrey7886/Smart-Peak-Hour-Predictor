@@ -1,0 +1,9 @@
+# API Keys Configuration
+# Replace these with your actual API keys
+
+# OpenWeatherMap API Key
+# Get your API key from https://openweathermap.org/api
+openweathermap_api_key: "your_api_key_here"
+
+# Other API keys can be added here as needed
+# eventbrite: "YOUR_EVENTBRITE_API_KEY_HERE" 

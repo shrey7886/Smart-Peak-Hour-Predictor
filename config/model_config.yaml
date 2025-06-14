@@ -1,0 +1,74 @@
+model_settings:
+  # Model selection criteria
+  min_data_points: 1000  # Minimum data points for complex models
+  max_data_points: 10000  # Maximum data points before using simpler models
+  
+  # Model parameters
+  tft:
+    hidden_size: 32
+    attention_head_size: 4
+    dropout: 0.1
+    hidden_continuous_size: 16
+    loss: "mse"
+    
+  lightgbm:
+    num_leaves: 31
+    learning_rate: 0.05
+    n_estimators: 100
+    max_depth: -1
+    
+  xgboost:
+    max_depth: 6
+    learning_rate: 0.1
+    n_estimators: 100
+    subsample: 0.8
+    
+  prophet:
+    changepoint_prior_scale: 0.05
+    seasonality_prior_scale: 10.0
+    holidays_prior_scale: 10.0
+    
+  arima:
+    max_p: 5
+    max_d: 2
+    max_q: 5
+    seasonal: true
+    
+  # Ensemble settings
+  ensemble:
+    min_models: 2
+    max_models: 5
+    voting_method: "weighted"  # or "simple"
+    
+  # Transfer learning settings
+  transfer_learning:
+    min_shops: 3
+    pretrain_epochs: 10
+    finetune_epochs: 5
+    validation_split: 0.2
+    
+  # Online learning settings
+  online_learning:
+    batch_size: 1000
+    drift_threshold: 0.1
+    max_versions: 10
+    save_frequency: 1000  # Save model every N updates
+    
+  # Feature engineering
+  features:
+    time_features:
+      - hour
+      - day_of_week
+      - month
+      - is_weekend
+    weather_features:
+      - temperature
+      - weather_main
+      - weather_description
+    holiday_features:
+      - is_holiday
+      - holiday_type
+    business_features:
+      - promotion_flag
+      - event_flag
+      - inventory_alert 

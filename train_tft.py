@@ -35,6 +35,7 @@ if len(df) < min_required_rows:
 df["shop"] = "shop_1"
 df["promotion_type"] = df["promotion_type"].astype(str).fillna("None")
 df["event_name"] = df["event_name"].astype(str).fillna("None")
+df["weather_main"] = df["weather_main"].astype(str).fillna("Clear")
 df = df.sort_values("time_idx")
 
 # === Time cutoff for encoder/decoder window ===
@@ -48,13 +49,21 @@ training = TimeSeriesDataSet(
     group_ids=["shop"],
     time_varying_known_reals=[
         "time_idx", "hour", "day_of_week", "is_weekend",
-        "staff_count", "promotion_flag", "event_flag", "inventory_alert"
+        "staff_count", "promotion_flag", "event_flag", "inventory_alert",
+        # Weather features
+        "temp", "humidity", "rain", "snow", "wind_speed", "clouds",
+        # Holiday features
+        "is_holiday"
     ],
     time_varying_unknown_reals=["transactions"],
-    time_varying_known_categoricals=["promotion_type", "event_name"],
+    time_varying_known_categoricals=[
+        "promotion_type", "event_name", "weather_main", "holiday_type"
+    ],
     categorical_encoders={
         "promotion_type": NaNLabelEncoder(add_nan=True),
-        "event_name": NaNLabelEncoder(add_nan=True)
+        "event_name": NaNLabelEncoder(add_nan=True),
+        "weather_main": NaNLabelEncoder(add_nan=True),
+        "holiday_type": NaNLabelEncoder(add_nan=True)
     },
     max_encoder_length=max_encoder_length,
     max_prediction_length=max_prediction_length,
