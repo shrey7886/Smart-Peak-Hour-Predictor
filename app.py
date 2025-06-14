@@ -80,7 +80,7 @@ if uploaded_file:
         # ───────────── Step 2: Forecasting ─────────────
         if st.button("🔮 Predict Peak Hours"):
             st.subheader("📈 Prediction Results")
-            
+
             try:
                 # Load and validate data
                 df = pd.read_csv("data/processed_shop.csv")
@@ -153,12 +153,12 @@ if uploaded_file:
                 # Create results dataframe with actual timestamps
                 last_timestamp = pd.to_datetime(df['timestamp'].iloc[-1])
                 future_timestamps = [last_timestamp + timedelta(hours=i+1) for i in range(max_prediction_length)]
-                
+
                 result_df = pd.DataFrame({
-                    "Timestamp": future_timestamps,
-                    "Hour": [ts.hour for ts in future_timestamps],
-                    "Predicted_Transactions": predictions[-max_prediction_length:].flatten()
-                })
+                        "Timestamp": future_timestamps,
+                        "Hour": [ts.hour for ts in future_timestamps],
+                        "Predicted_Transactions": predictions[-max_prediction_length:].flatten()
+                    })
 
                 # Identify peak hours
                 top_indices = result_df["Predicted_Transactions"].argsort()[-top_n_peaks:][::-1]
@@ -168,7 +168,7 @@ if uploaded_file:
                 result_df["Suggestion"] = result_df["Predicted_Transactions"].apply(
                     lambda x: "📈 Add staff/stock!" if x > result_df["Predicted_Transactions"].quantile(0.75) else "✅ Normal"
                 )
-                
+
                 # Calculate confidence levels based on prediction values
                 mean_pred = result_df["Predicted_Transactions"].mean()
                 std_pred = result_df["Predicted_Transactions"].std()
@@ -250,7 +250,7 @@ if uploaded_file:
                 # Save predictions
                 result_df.to_csv("data/predicted_peak_hours.csv", index=False)
                 st.success("✅ Detailed forecast saved to: data/predicted_peak_hours.csv")
-
+            
             except Exception as e:
                 st.error(f"❌ An unexpected error occurred: {str(e)}")
                 st.stop()

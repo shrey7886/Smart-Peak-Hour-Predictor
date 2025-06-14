@@ -6,8 +6,8 @@ import torch
 from pytorch_forecasting import TimeSeriesDataSet, TemporalFusionTransformer
 from pytorch_forecasting.data import NaNLabelEncoder
 from pytorch_forecasting.metrics import QuantileLoss
-from lightning.pytorch import Trainer, seed_everything
-from lightning.pytorch.callbacks import ModelCheckpoint
+from pytorch_lightning import Trainer, seed_everything
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 # === CONFIG ===
 data_path = "data/processed_shop.csv"
