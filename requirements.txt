@@ -75,5 +75,8 @@ absl-py>=0.4.0
 markdown>=2.6.0
 werkzeug>=1.0.0
 
+# GraphQL API
+uvicorn>=0.22.0,<0.23.0
+
 # Note: Some packages may have interdependencies. If you encounter issues,
 # try installing in the order listed above.

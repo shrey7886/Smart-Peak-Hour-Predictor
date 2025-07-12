@@ -13,6 +13,7 @@ import io
 import yaml
 import plotly.graph_objects as go
 from pathlib import Path
+import requests  # Add this import
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -677,6 +678,7 @@ if uploaded_file:
                 # Load and validate data
                 df = pd.read_csv("data/processed_shop.csv")
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
+                df['timestamp'] = df['timestamp'].astype(str)  # Convert to string for JSON serialization
                 
                 # Ensure time_idx is integer
                 df['time_idx'] = df['time_idx'].astype(int)
@@ -694,107 +696,64 @@ if uploaded_file:
                 df["weather_main"] = df["weather_main"].astype(str).fillna("Clear")
 
                 # Ensure all required columns are present and properly formatted
-                required_reals = [
-                    "time_idx", "transactions", "hour", "day_of_week", "is_weekend",
-                    "staff_count", "promotion_flag", "event_flag", "inventory_alert",
-                    "temp", "humidity", "rain", "snow", "wind_speed", "clouds",
-                    "is_holiday"
+                required_columns = [
+                    "timestamp", "hour", "day_of_week", "is_weekend", "staff_count", 
+                    "promotion_flag", "promotion_type", "event_flag", "event_name", 
+                    "inventory_alert", "temp", "humidity", "rain", "snow", "wind_speed", 
+                    "clouds", "is_holiday", "holiday_type", "holiday_name", "weather_main"
                 ]
-                
-                # Verify and convert all required real columns to float
-                for col in required_reals:
-                    if col in df.columns:
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                
-                # Drop rows with missing values and sort
-                df = df.dropna(subset=required_reals)
-                df = df.sort_values("time_idx")
+                for col in required_columns:
+                    if col not in df.columns:
+                        if col in ["promotion_type", "event_name", "weather_main", "holiday_type", "holiday_name"]:
+                            df[col] = "None"
+                        elif col in ["promotion_flag", "event_flag", "inventory_alert", "is_holiday", "is_weekend"]:
+                            df[col] = 0
+                        else:
+                            df[col] = 0.0
 
-                # Verify time_idx is sequential
-                if not (df['time_idx'].diff().dropna() == 1).all():
-                    df['time_idx'] = np.arange(len(df))
-
-                # TimeSeriesDataSet parameters
-                max_encoder_length = 24
+                # Prepare the last N rows for prediction (future data)
                 max_prediction_length = 6
-                top_n_peaks = 3
+                future_data = df.tail(max_prediction_length)[required_columns].to_dict(orient="records")
 
-                training_cutoff = df["time_idx"].max() - max_prediction_length
-                
-                # Create training dataset
-                training = TimeSeriesDataSet(
-                    df[df["time_idx"] <= training_cutoff],
-                    time_idx="time_idx",
-                    target="transactions",
-                    group_ids=["shop"],
-                    time_varying_known_reals=[
-                        "time_idx", "hour", "day_of_week", "is_weekend",
-                        "staff_count", "promotion_flag", "event_flag", "inventory_alert",
-                        # Weather features
-                        "temp", "humidity", "rain", "snow", "wind_speed", "clouds",
-                        # Holiday features
-                        "is_holiday"
-                    ],
-                    time_varying_unknown_reals=["transactions"],
-                    time_varying_known_categoricals=[
-                        "promotion_type", "event_name", "weather_main", "holiday_type"
-                    ],
-                    categorical_encoders={
-                        "promotion_type": NaNLabelEncoder(add_nan=True),
-                        "event_name": NaNLabelEncoder(add_nan=True),
-                        "weather_main": NaNLabelEncoder(add_nan=True),
-                        "holiday_type": NaNLabelEncoder(add_nan=True)
-                    },
-                    max_encoder_length=max_encoder_length,
-                    max_prediction_length=max_prediction_length,
-                    add_relative_time_idx=True,
-                    add_target_scales=True,
-                    add_encoder_length=True,
-                )
-
-                # Create prediction dataset
-                prediction = TimeSeriesDataSet.from_dataset(training, df, predict=True, stop_randomization=True)
-                prediction_dl = prediction.to_dataloader(train=False, batch_size=1, num_workers=0)
-
-                # Load model
-                model_path = "models/shop_tft.ckpt"
-                if not os.path.exists(model_path):
-                    st.error("❌ Model checkpoint not found. Please train it using Phase 2.")
+                # --- REST API Call ---
+                # Use container name for Docker networking, fallback to localhost for local development
+                api_url = "http://api:8000/predict"  # Docker container name
+                # Fallback for local development
+                if not os.path.exists("/.dockerenv"):
+                    api_url = "http://localhost:8000/predict"
+                try:
+                    response = requests.post(api_url, json=future_data)
+                    response.raise_for_status()
+                    api_predictions = response.json()
+                except Exception as e:
+                    st.error(f"❌ Error calling REST API: {e}")
                     st.stop()
 
-                model = TemporalFusionTransformer.load_from_checkpoint(model_path, map_location=torch.device("cpu"))
+                # Convert API response to DataFrame for display
+                result_df = pd.DataFrame(api_predictions)
+                result_df["Hour"] = pd.to_datetime(result_df["timestamp"]).dt.hour
+                result_df["Predicted_Transactions"] = result_df["predicted_transactions"]
 
-                # Make predictions
-                predictions = model.predict(prediction_dl)
-                predictions = predictions.cpu().numpy()
-
-                # Get the last time index and create future time steps
-                last_time_idx = df['time_idx'].max()
-                future_time_steps = range(last_time_idx + 1, last_time_idx + max_prediction_length + 1)
-
-                # Create results dataframe with actual timestamps
-                last_timestamp = pd.to_datetime(df['timestamp'].iloc[-1])
-                future_timestamps = [last_timestamp + timedelta(hours=i+1) for i in range(max_prediction_length)]
-
-                result_df = pd.DataFrame({
-                        "Timestamp": future_timestamps,
-                        "Hour": [ts.hour for ts in future_timestamps],
-                    "Predicted_Transactions": predictions[-max_prediction_length:].flatten(),
-                    "Weather": df["weather_main"].iloc[-max_prediction_length:].values,
-                    "Temperature": df["temp"].iloc[-max_prediction_length:].values,
-                    "Holiday_Type": df["holiday_type"].iloc[-max_prediction_length:].values,
-                    "Rain": df["rain"].iloc[-max_prediction_length:].values
-                    })
+                # Add mock columns for display if needed
+                if "weather_main" in df.columns:
+                    result_df["Weather"] = df["weather_main"].iloc[-max_prediction_length:].values
+                if "temp" in df.columns:
+                    result_df["Temperature"] = df["temp"].iloc[-max_prediction_length:].values
+                if "holiday_type" in df.columns:
+                    result_df["Holiday_Type"] = df["holiday_type"].iloc[-max_prediction_length:].values
+                if "rain" in df.columns:
+                    result_df["Rain"] = df["rain"].iloc[-max_prediction_length:].values
 
                 # Identify peak hours
+                top_n_peaks = 3
                 top_indices = result_df["Predicted_Transactions"].argsort()[-top_n_peaks:][::-1]
                 peak_hours = result_df.iloc[top_indices].copy()
 
                 # Add suggestions with weather and holiday context
                 def get_suggestion(row):
                     base_suggestion = "📈 Add staff/stock!" if row["Predicted_Transactions"] > result_df["Predicted_Transactions"].quantile(0.75) else "✅ Normal"
-                    weather_context = f" ({row['Weather']}, {row['Temperature']:.1f}°C)"
-                    holiday_context = f" - {row['Holiday_Type']}"
+                    weather_context = f" ({row['Weather']}, {row['Temperature']:.1f}°C)" if "Weather" in row and "Temperature" in row else ""
+                    holiday_context = f" - {row['Holiday_Type']}" if "Holiday_Type" in row else ""
                     return base_suggestion + weather_context + holiday_context
 
                 result_df["Suggestion"] = result_df.apply(get_suggestion, axis=1)
@@ -829,12 +788,12 @@ if uploaded_file:
                             f"{(busy_hours/len(result_df))*100:.0f}% of predicted period")
                 with col4:
                     st.metric("Weather Impact", 
-                            f"{result_df['Weather'].mode().iloc[0]}",
-                            f"Avg Temp: {result_df['Temperature'].mean():.1f}°C")
+                            f"{result_df['Weather'].mode().iloc[0] if 'Weather' in result_df else 'N/A'}",
+                            f"Avg Temp: {result_df['Temperature'].mean():.1f}°C" if 'Temperature' in result_df else "")
 
                 # Display detailed predictions
                 st.subheader("🕒 Hourly Predictions")
-                display_cols = ["Timestamp", "Hour", "Predicted_Transactions", "Weather", "Temperature", "Holiday_Type", "Suggestion", "Confidence"]
+                display_cols = ["timestamp", "Hour", "Predicted_Transactions", "Weather", "Temperature", "Holiday_Type", "Suggestion", "Confidence"]
                 st.dataframe(result_df[display_cols])
 
                 # Visualization
@@ -851,113 +810,21 @@ if uploaded_file:
 
                 # Add weather labels
                 for i, bar in enumerate(bars):
-                    ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
-                            f"{result_df['Weather'].iloc[i]}\n{result_df['Temperature'].iloc[i]:.1f}°C",
-                            ha='center', va='bottom', rotation=0, fontsize=8)
+                    if 'Weather' in result_df and 'Temperature' in result_df:
+                        ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
+                                f"{result_df['Weather'].iloc[i]}\n{result_df['Temperature'].iloc[i]:.1f}°C",
+                                ha='center', va='bottom', rotation=0, fontsize=8)
 
                 # Plot 2: Historical vs Predicted with weather context
                 recent_actual = df.tail(12)[['hour', 'transactions', 'weather_main', 'temp']].copy()
-                ax2.plot(recent_actual['hour'], recent_actual['transactions'], 
-                        label='Recent Actual', color='gray', linestyle='--')
-                ax2.plot(result_df['Hour'], result_df['Predicted_Transactions'], 
-                        label='Predicted', color='blue')
-                
-                # Add weather annotations
-                for i, (_, row) in enumerate(result_df.iterrows()):
-                    ax2.annotate(f"{row['Weather']}\n{row['Temperature']:.1f}°C",
-                               (row['Hour'], row['Predicted_Transactions']),
-                               xytext=(10, 10), textcoords='offset points',
-                               fontsize=8, bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.3))
-
+                ax2.plot(recent_actual['hour'], recent_actual['transactions'], label='Actual', color='gray')
+                ax2.plot(result_df['Hour'], result_df['Predicted_Transactions'], label='Predicted', color='blue')
                 ax2.set_xlabel("Hour of Day")
                 ax2.set_ylabel("Transactions")
                 ax2.set_title("Recent Historical vs Predicted Transactions (with Weather)")
                 ax2.legend()
 
-                plt.tight_layout()
                 st.pyplot(fig)
 
-                # Staffing Recommendations with Weather Context
-                st.subheader("👥 Staffing Recommendations")
-                for _, row in peak_hours.iterrows():
-                    current_staff = df.iloc[-1]['staff_count']
-                    weather_factor = 1.2 if row['Weather'] in ['Rain', 'Snow'] else 1.0
-                    holiday_factor = 1.3 if row['Holiday_Type'] in ['Holiday', 'Weekend'] else 1.0
-                    
-                    if row["Predicted_Transactions"] > df['transactions'].quantile(0.75):
-                        recommended_staff = int(current_staff * weather_factor * holiday_factor) + 2
-                    elif row["Predicted_Transactions"] > df['transactions'].mean():
-                        recommended_staff = int(current_staff * weather_factor * holiday_factor) + 1
-                    else:
-                        recommended_staff = current_staff
-                    
-                    st.info(f"""
-                    🕒 **Hour {row['Hour']}:00** (Confidence: {row['Confidence']})
-                    - Predicted Transactions: {row['Predicted_Transactions']:.1f}
-                    - Weather: {row['Weather']} ({row['Temperature']:.1f}°C)
-                    - Day Type: {row['Holiday_Type']}
-                    - Current Staff: {current_staff}
-                    - Recommended Staff: {recommended_staff}
-                    - Action: {row['Suggestion']}
-                    """)
-
-                # Display predictions
-                st.success("Predictions generated successfully!")
-                
-                # Display holiday information at the top
-                display_holiday_info(result_df)
-                
-                # Create tabs for different views
-                tab1, tab2, tab3 = st.tabs(["📈 Predictions", "🌦️ Weather Impact", "📊 Analytics"])
-                
-                with tab1:
-                    # Display predictions chart
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(
-                        x=predictions["timestamp"],
-                        y=predictions["transactions"],
-                        mode="lines",
-                        name="Predicted Transactions",
-                        line=dict(color="blue")
-                    ))
-                    
-                    # Add peak hours markers
-                    peak_hours = predictions[predictions["is_peak"] == 1]
-                    fig.add_trace(go.Scatter(
-                        x=peak_hours["timestamp"],
-                        y=peak_hours["transactions"],
-                        mode="markers",
-                        name="Peak Hours",
-                        marker=dict(
-                            color="red",
-                            size=10,
-                            symbol="star"
-                        )
-                    ))
-                    
-                    fig.update_layout(
-                        title="Transaction Predictions with Peak Hours",
-                        xaxis_title="Time",
-                        yaxis_title="Predicted Transactions",
-                        height=500
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Display weather strip below the chart
-                    display_weather_strip(predictions)
-                
-                with tab2:
-                    # Display weather impact analysis
-                    create_weather_impact_chart(predictions)
-                    create_holiday_impact_chart(predictions)
-                
-                with tab3:
-                    # Display comprehensive analytics dashboard
-                    display_weather_holiday_dashboard(predictions)
-            
             except Exception as e:
                 st.error(f"❌ Prediction error: {e}")
-                if use_mock_data:
-                    st.info("ℹ️ Using mock weather and holiday data. For real-time data, add your OpenWeatherMap API key.")
-                else:
-                    st.error("Please ensure you have trained the model with the latest data including weather and holiday features.")
