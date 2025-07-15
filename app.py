@@ -64,40 +64,111 @@ if 'shop_data' not in st.session_state:
 # Custom CSS for better styling
 st.markdown("""
 <style>
-    .main {
-        padding: 2rem;
+    body, .main, .stApp {
+        background-color: #181c20 !important;
+        color: #f5f6fa !important;
+        font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+    }
+    .stSidebar, .css-1d391kg, .css-1lcbmhc, .css-1v0mbdj, .css-1cypcdb {
+        background-color: #20232a !important;
+        color: #f5f6fa !important;
     }
     .stButton>button {
         width: 100%;
-        border-radius: 5px;
+        border-radius: 6px;
         height: 3em;
+        background: #2563eb !important;
+        color: #fff !important;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 2px 8px rgba(30,41,59,0.08);
+        transition: background 0.2s;
+    }
+    .stButton>button:hover {
+        background: #1e293b !important;
+        color: #fff !important;
     }
     .stProgress .st-bo {
-        background-color: #4CAF50;
+        background-color: #2563eb;
     }
-    .metric-card {
-        background-color: #f0f2f6;
+    .metric-card, .info-box, .warning-box, .success-box {
+        background-color: #23272f;
+        color: #f5f6fa;
         padding: 1rem;
-        border-radius: 5px;
+        border-radius: 8px;
         margin: 0.5rem 0;
+        box-shadow: 0 1px 4px rgba(30,41,59,0.10);
     }
     .info-box {
-        background-color: #e8f4f8;
-        padding: 1rem;
-        border-radius: 5px;
-        margin: 0.5rem 0;
+        border-left: 4px solid #2563eb;
     }
     .warning-box {
-        background-color: #fff3cd;
-        padding: 1rem;
-        border-radius: 5px;
-        margin: 0.5rem 0;
+        border-left: 4px solid #facc15;
+        background-color: #3a2e1a;
+        color: #facc15;
     }
     .success-box {
-        background-color: #d4edda;
-        padding: 1rem;
-        border-radius: 5px;
+        border-left: 4px solid #22c55e;
+        background-color: #1e2d23;
+        color: #22c55e;
+    }
+    .stMarkdown, .stTextInput>div>input, .stSelectbox>div>div>div>input, .stFileUploader>div>div>div>input {
+        color: #f5f6fa !important;
+        background-color: #23272f !important;
+        border-radius: 6px;
+    }
+    .stDownloadButton>button {
+        background: #2563eb;
+        color: #fff;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 2px 8px rgba(30,41,59,0.08);
+        transition: background 0.2s;
+    }
+    .stDownloadButton>button:hover {
+        background: #1e293b;
+        color: #fff;
+    }
+    .stFileUploader>div>div {
+        background: #23272f !important;
+        color: #f5f6fa !important;
+        border-radius: 6px;
+        border: 1px solid #2563eb;
+    }
+    .stMetric {
+        background: #23272f;
+        color: #f5f6fa;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
         margin: 0.5rem 0;
+        box-shadow: 0 1px 4px rgba(30,41,59,0.10);
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        background: #23272f;
+        border-radius: 8px 8px 0 0;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #f5f6fa;
+        font-weight: 600;
+    }
+    .stTabs [aria-selected="true"] {
+        background: #2563eb;
+        color: #fff;
+        border-radius: 8px 8px 0 0;
+    }
+    .stAlert {
+        background: #23272f !important;
+        color: #f5f6fa !important;
+        border-radius: 8px;
+        border-left: 4px solid #2563eb;
+    }
+    .stSpinner {
+        color: #2563eb !important;
+    }
+    .stTextInput>div>input:focus, .stSelectbox>div>div>div>input:focus {
+        border: 1.5px solid #2563eb !important;
+        outline: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -151,11 +222,13 @@ def display_shop_selector():
                 # Quick actions
                 if st.button("📊 View Dashboard", key=f"view_{shop['shop_id']}"):
                     st.session_state.current_shop = shop['shop_id']
+                    st.session_state.shop_selected = True
                     initialize_managers(shop['shop_id'])
                     st.experimental_rerun()
                 
                 if st.button("📈 View History", key=f"history_{shop['shop_id']}"):
                     st.session_state.current_shop = shop['shop_id']
+                    st.session_state.shop_selected = True
                     st.session_state.show_history = True
                     initialize_managers(shop['shop_id'])
                     st.experimental_rerun()
@@ -200,6 +273,7 @@ def display_shop_selector():
                 }
                 save_shop_profile(shop['shop_id'], shop['name'], shop['location'])
                 st.session_state.current_shop = new_shop_id
+                st.session_state.shop_selected = True
                 initialize_managers(new_shop_id)
                 st.sidebar.success(f"✅ Successfully created shop: {new_shop_id}")
                 st.experimental_rerun()
@@ -272,65 +346,155 @@ def main():
         db = DatabaseManager()
         db.init_db()
 
-        # Display shop selector in sidebar
-        display_shop_selector()
+        # --- Sidebar Navigation ---
+        st.sidebar.title("Smart Peak Hour Predictor")
+        st.sidebar.markdown("---")
 
-        # Get current shop from session state
-        current_shop = st.session_state.get('current_shop')
-        if not current_shop:
-            st.info("👈 Please select a shop from the sidebar to view its dashboard")
-            return
+        # Shop Management Section
+        st.sidebar.header("🏪 Shop Management")
+        search_query = st.sidebar.text_input("🔍 Search Shops", "")
+        all_shops = get_all_shops()
+        if search_query:
+            all_shops = [shop for shop in all_shops if search_query.lower() in shop['shop_id'].lower()]
+        st.sidebar.metric("Total Shops", len(all_shops))
+        active_shops = len([shop for shop in all_shops if 'last_upload' in shop and shop['last_upload']])
+        st.sidebar.metric("Active Shops", active_shops)
+        if all_shops:
+            st.sidebar.markdown("### 📋 Existing Shops")
+            for shop in all_shops:
+                if st.sidebar.button(f"Select {shop['shop_id']}", key=f"select_{shop['shop_id']}"):
+                    st.session_state.current_shop = shop['shop_id']
+                    st.session_state.shop_selected = True
+                    initialize_managers(shop['shop_id'])
+                    st.experimental_rerun()
+        st.sidebar.markdown("---")
 
-        # Get shop profile
-        shop_profile = get_shop_profile(current_shop)
-        if not shop_profile:
-            st.error(f"Shop {current_shop} not found")
-            return
-
-        # Get shop data
-        df = None
-        if st.session_state.get('shop_data') is not None:
-            df = st.session_state.shop_data
+        # Data Upload Section
+        st.sidebar.header("📤 Data Upload")
+        if st.session_state.get('current_shop'):
+            uploaded_file = st.sidebar.file_uploader("Upload CSV for this shop", type=["csv"], key="sidebar_upload")
+            if uploaded_file is not None:
+                try:
+                    df_preview = pd.read_csv(uploaded_file)
+                    st.session_state.uploaded_data = df_preview
+                    st.sidebar.success("File uploaded! Preview below.")
+                    st.sidebar.dataframe(df_preview.head(10))
+                    # Save uploaded data
+                    shop_data_path = f"data/shops/{st.session_state.current_shop}/processed_data.csv"
+                    os.makedirs(os.path.dirname(shop_data_path), exist_ok=True)
+                    df_preview.to_csv(shop_data_path, index=False)
+                    st.session_state.shop_data = df_preview
+                except Exception as upload_err:
+                    st.sidebar.error(f"Failed to process uploaded file: {upload_err}")
         else:
-            # Try to load from processed data
-            try:
-                df = pd.read_csv(f"data/shops/{current_shop}/processed_data.csv")
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
-                st.session_state.shop_data = df
-            except Exception as e:
-                logger.error(f"Error loading shop data: {str(e)}")
-                st.warning("No data available for this shop. Please upload data first.")
-                return
+            st.sidebar.info("Select a shop to enable data upload.")
+        st.sidebar.markdown("---")
 
-        # Preprocess data if needed
-        if df is not None and not df.empty:
-            try:
-                df = validate_and_preprocess(df)
-                st.session_state.shop_data = df
-            except Exception as e:
-                logger.error(f"Error in preprocessing: {str(e)}")
-                st.error("Error processing data. Using raw data instead.")
+        # Model Selection Section
+        st.sidebar.header("🤖 Model Selection")
+        model_options = ["Temporal Fusion Transformer"]  # Add more as needed
+        selected_model = st.sidebar.selectbox("Choose Prediction Model", model_options)
+        st.sidebar.markdown("---")
 
-        # Check if model exists
+        # Results/Analytics Section
+        st.sidebar.header("📊 Results & Analytics")
+        st.sidebar.info("Results and analytics will appear in the main area after processing.")
+        st.sidebar.markdown("---")
+
+        # History Section
+        st.sidebar.header("🕑 History")
+        st.sidebar.info("Recent uploads and predictions will be tracked here.")
+        st.sidebar.markdown("---")
+
+        # Settings Section
+        st.sidebar.header("⚙️ Settings")
+        st.sidebar.info("User preferences and configuration options coming soon.")
+        st.sidebar.markdown("---")
+
+        # --- Chatbot Section ---
+        st.sidebar.header("💬 Chatbot")
+        st.sidebar.markdown("Ask questions about the app, data, or features!")
+        # API key input
+        hf_api_key = st.sidebar.text_input(
+            "Hugging Face API Key",
+            type="password",
+            help="Enter your Hugging Face Inference API key. Get one at https://huggingface.co/settings/tokens"
+        )
+        if hf_api_key:
+            st.session_state["hf_api_key"] = hf_api_key
+        # Chat history
+        if "chat_history" not in st.session_state:
+            st.session_state["chat_history"] = []
+        for msg in st.session_state["chat_history"][-6:]:
+            role = "🧑" if msg["role"] == "user" else "🤖"
+            st.sidebar.markdown(f"**{role}:** {msg['content']}")
+        # User input
+        user_input = st.sidebar.text_input("Type your question:", key="chatbot_input")
+        if st.sidebar.button("Send", key="chatbot_send"):
+            if user_input:
+                st.session_state["chat_history"].append({"role": "user", "content": user_input})
+                # Placeholder for bot response (to be replaced with RAG logic)
+                st.session_state["chat_history"].append({"role": "assistant", "content": "(Thinking... will answer soon)"})
+
+        # --- Main Page Content ---
+        st.title("Smart Peak Hour Predictor Dashboard")
+        if not st.session_state.get('current_shop'):
+            st.markdown("""
+                # 👋 Welcome!
+                Select a shop from the sidebar or add a new one to get started.
+            """)
+            st.stop()
+
+        # Data Preview and Validation
+        if st.session_state.get('shop_data') is not None:
+            st.subheader("Data Preview")
+            st.dataframe(st.session_state.shop_data.head(20))
+            st.write(f"Rows: {st.session_state.shop_data.shape[0]}, Columns: {st.session_state.shop_data.shape[1]}")
+            # Basic validation
+            required_cols = ['timestamp', 'transactions']
+            missing_cols = [col for col in required_cols if col not in st.session_state.shop_data.columns]
+            if missing_cols:
+                st.error(f"Missing required columns: {missing_cols}")
+                st.stop()
+        else:
+            st.info("No data uploaded for this shop. Please upload a CSV file using the sidebar.")
+            st.stop()
+
+        # Model Training and Prediction
         model_path = "models/shop_tft.ckpt"
         if not os.path.exists(model_path):
             st.warning("⚠️ Model not found. Please train the model first.")
-            # Display dashboard without predictions
+            if st.button("Train Model", key="train_model_btn_main"):
+                with st.spinner("Training model. This may take a while..."):
+                    try:
+                        import subprocess
+                        result = subprocess.run(["python", "train_tft.py"], capture_output=True, text=True)
+                        if result.returncode == 0:
+                            st.success("Model trained successfully! You can now run predictions.")
+                            st.session_state.model_trained = True
+                        else:
+                            st.error(f"Training failed: {result.stderr}")
+                    except Exception as train_err:
+                        st.error(f"Error during training: {train_err}")
+            # Only show dashboard in preview mode (no predictions)
             display_shop_dashboard_v2(
-                df=df,
-                shop_id=current_shop,
-                shop_name=shop_profile.get('name', current_shop),
-                db=db,
+                df=st.session_state.shop_data,
+                shop_id=st.session_state.current_shop,
+                shop_name=st.session_state.current_shop,
                 skip_predictions=True
             )
         else:
-            # Display dashboard with predictions
-            display_shop_dashboard_v2(
-                df=df,
-                shop_id=current_shop,
-                shop_name=shop_profile.get('name', current_shop),
-                db=db
-            )
+            if st.button("Predict", key="predict_btn_main"):
+                st.session_state.run_predictions = True
+            if st.session_state.get("run_predictions"):
+                display_shop_dashboard_v2(
+                    df=st.session_state.shop_data,
+                    shop_id=st.session_state.current_shop,
+                    shop_name=st.session_state.current_shop,
+                    skip_predictions=False
+                )
+            else:
+                st.info("Click 'Predict' to run predictions and view analytics.")
 
     except Exception as e:
         logger.error(f"Error in main app: {str(e)}")
