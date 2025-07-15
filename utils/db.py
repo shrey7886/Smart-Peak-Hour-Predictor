@@ -62,36 +62,28 @@ def init_db():
 def save_shop_profile(shop_id: str, name: str, location: str) -> None:
     """Save or update shop profile in the database."""
     try:
-        # Create shop profile with all required fields
-        shop = {
-            'shop_id': shop_id,
-            'name': name,  # Ensure name is included
-            'location': location,
-            'created_at': datetime.now().isoformat(),
-            'last_upload': None,
-            'settings': {
-                'timezone': 'Asia/Kolkata',
-                'business_hours': {
-                    'start': '09:00',
-                    'end': '21:00'
-                }
-            }
-        }
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Insert or update shop profile in database
+        cursor.execute('''
+            INSERT OR REPLACE INTO shop_profiles 
+            (shop_id, name, location, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (shop_id, name, location, datetime.now().isoformat(), datetime.now().isoformat()))
+        
+        conn.commit()
         
         # Create directories for the shop
         create_shop_directories(shop_id)
         
-        # Save to database
-        db_path = os.path.join('data', 'shops', shop_id, 'profile.json')
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        with open(db_path, 'w') as f:
-            json.dump(shop, f, indent=4)
-            
         logger.info(f"Shop profile saved/updated: {shop_id}")
         
     except Exception as e:
         logger.error(f"Error saving shop profile: {str(e)}")
         raise
+    finally:
+        conn.close()
 
 def get_shop_profile(shop_id):
     """Retrieve a shop profile by ID."""

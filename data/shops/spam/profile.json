@@ -1,0 +1,14 @@
+{
+    "shop_id": "spam",
+    "name": "spam",
+    "location": "Bengaluru",
+    "created_at": "2025-07-12T11:44:36.986641",
+    "last_upload": null,
+    "settings": {
+        "timezone": "Asia/Kolkata",
+        "business_hours": {
+            "start": "09:00",
+            "end": "21:00"
+        }
+    }
+}
